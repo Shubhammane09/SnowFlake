@@ -1,0 +1,58 @@
+--Shuham Mane ADF INTEGRATION 
+CREATE OR REPLACE STORAGE INTEGRATION ADF_ADLSGEN2_INT
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = 'AZURE'
+  ENABLED = TRUE
+  AZURE_TENANT_ID = 'eecc57ea-542e-46da-a24c-e543715a0d37'
+  STORAGE_ALLOWED_LOCATIONS = ('azure://snowflakeshubham.blob.core.windows.net/sksnowflakes/');
+  -- https://snowflakeshubham.blob.core.windows.net/sksnowflakes
+
+
+  desc storage integration adf_adlsgen2_int;
+  desc file format MYDB.FILE_FORMATS.JSON_FILE_FORMAT;
+  desc file format MYDB.FILE_FORMATS.CSV_FILE_FORMAT;
+
+// Create a file format object of csv type
+CREATE OR REPLACE file format mydb.file_formats.csv_file_format
+    type = csv
+    field_delimiter = ','
+    skip_header = 1
+    empty_field_as_null = TRUE;
+
+// Create a file format object of JSON type
+CREATE OR REPLACE file format mydb.file_formats.JSON_file_format
+    type = JSON  
+
+  --Creating stage object
+  CREATE OR REPLACE STAGE external_stages.adf_ext_stage
+  STORAGE_INTEGRATION = ADF_ADLSGEN2_INT
+  URL = 'azure://snowflakeshubham.blob.core.windows.net/sksnowflakes/'
+  FILE_FORMAT = MYDB.FILE_FORMATS.JSON_FILE_FORMAT;
+  
+--Listing files in the stage
+list @MYDB.EXTERNAL_STAGES.AZURE_PIPE_INT
+
+//Alter your storage integration
+alter storage integration ADF_ADLSGEN2_INT
+set STORAGE_ALLOWED_LOCATIONS = ('azure://snowflakeshubham.blob.core.windows.net/csv/', 'azure://snowflakeshubham.blob.core.windows.net/json/','azure://snowflakeshubham.blob.core.windows.net/pipes/csv/');
+
+
+--(or)
+
+-- create or replace storage integration s3_int
+--   TYPE = EXTERNAL_STAGE
+--   STORAGE_PROVIDER = S3
+--   ENABLED = TRUE 
+--   STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::555064756008:role/snowflake_access_role'
+--   STORAGE_ALLOWED_LOCATIONS = ('s3://awss3bucketjana/csv/', 's3://awss3bucketjana/json/','s3://awss3bucketjana/pipes/csv/')
+--   COMMENT = 'Integration with aws s3 buckets' ;
+ 
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+ 
