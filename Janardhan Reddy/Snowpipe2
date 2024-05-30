@@ -1,0 +1,77 @@
+--create a new notification integration 
+create notification integration SNOWPIPE_DEMO_EVENT
+enabled = true
+type = queue
+notification_provider = azure_storage_queue
+azure_storage_queue_primary_uri = 'https://snowflakeadlsgen2sa.queue.core.windows.net/snowpipe-notification-queue'
+azure_tenant_id = '8053a638-bf7d-45de-b473-d0db4d3b3b08';
+
+show integrations;  
+
+DESC notification integration SNOWPIPE_DEMO_EVENT;
+
+alter file format file_formats.csv_file_format
+set ERROR_ON_COLUMN_COUNT_MISMATCH = false;
+
+desc file format file_formats.csv_file_format;
+
+--create a stage object by using storage integration
+CREATE OR REPLACE STAGE demo_db.external_stages.azure_pipe_int
+  url = 'azure://snowflakeadlsgen2sa.blob.core.windows.net/pipes/csv/'
+  credentials = (azure_sas_token= '?sv=2022-11-02&ss=bfqt&srt=sco&sp=rwdlacupyx&se=2024-07-16T17:34:40Z&st=2024-05-16T09:34:40Z&spr=https&sig=je4fB%2BXyH07tuWfctGOhJrGIvXscnJQ%2FjhhVSfP%2BjhU%3D'
+  );
+
+list @demo_db.external_stages.azure_pipe_int;
+
+--create a table to load these files
+create or replace table emp_data (
+EMPLOYEE_ID	int,
+FIRST_NAME	varchar(20),
+LAST_NAME	varchar(20),
+EMAIL	varchar(30),
+PHONE_NUMBER    varchar(30),
+HIRE_DATE	varchar(20),
+JOB_ID	varchar(20),
+SALARY	decimal(10,2),
+COMMISSION_PCT	decimal(5,2),
+MANAGER_ID	int,
+DEPARTMENT_ID int
+);
+
+select * from emp_data;
+
+--create pipe schema to keep the pipe objects
+create or replace schema pipes;
+
+--create pipe 
+create or replace pipe demo_db.pipes.employee_pipe
+auto_ingest = true
+integration = SNOWPIPE_DEMO_EVENT
+as
+copy into demo_db.public.emp_data
+from @demo_db.external_stages.azure_pipe_int
+file_format = file_formats.csv_file_format
+pattern = '.EMPLOYEES.';
+
+alter pipe demo_db.pipes.employee_pipe refresh;
+
+desc pipe demo_db.pipes.employee_pipe;
+
+select * from emp_data;
+
+truncate table emp_data;
+
+--STEP 1 TO CHECK THE PIPE STATUS
+select SYSTEM$PIPE_STATUS('demo_db.pipes.employee_pipe');
+
+--STEP 2 TO CHECK THE COPY HISTORY 
+SELECT * FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY
+(TABLE_NAME => 'demo_db.public.emp_data',
+START_TIME => DATEADD(HOURS, -8, CURRENT_TIMESTAMP())
+));
+
+--STEP 3 TO VALIDATE THE PIPE LOAD
+SELECT * FROM TABLE(INFORMATION_SCHEMA.VALIDATE_PIPE_LOAD
+(PIPE_NAME => 'demo_db.pipes.employee_pipe',
+START_TIME => DATEADD(HOURS, -8, CURRENT_TIMESTAMP())
+));
