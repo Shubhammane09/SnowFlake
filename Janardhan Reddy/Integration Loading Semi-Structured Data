@@ -1,0 +1,134 @@
+-- ADF INTEGRATION 
+CREATE OR REPLACE STORAGE INTEGRATION ADF_ADLSGEN2_INT
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = 'AZURE'
+  ENABLED = TRUE
+  AZURE_TENANT_ID = 'eecc57ea-542e-46da-a24c-e543715a0d37'
+  STORAGE_ALLOWED_LOCATIONS = ('azure://snowflakeshubham.blob.core.windows.net/json/', 'azure://snowflakeshubham.blob.core.windows.net/csv/');
+  -- https://snowflakeshubham.blob.core.windows.net/sksnowflakes
+
+
+  desc storage integration adf_adlsgen2_int;
+  desc file format MYDB.FILE_FORMATS.FILE_FORMAT_JSON;
+
+  --Creating stage object
+  CREATE OR REPLACE STAGE external_stages.adf_ext_stage
+  STORAGE_INTEGRATION = ADF_ADLSGEN2_INT
+  URL = 'azure://snowflakeshubham.blob.core.windows.net/json/'
+  FILE_FORMAT = MYDB.FILE_FORMATS.FILE_FORMAT_JSON;
+  
+--Listing files in the stage
+list @MYDB.EXTERNAL_STAGES.ADF_EXT_STAGE
+
+
+-- Processing semi-structured data (Ex.JSON Data)
+
+--Creating required schemas
+CREATE OR REPLACE SCHEMA MYDB.external_stages;
+CREATE OR REPLACE SCHEMA MYDB.STAGE_TBLS;
+CREATE OR REPLACE SCHEMA MYDB.INTG_TBLS;
+
+--Creating file format object
+CREATE OR REPLACE FILE FORMAT MYDB.file_formats.FILE_FORMAT_JSON
+ TYPE = JSON;
+
+
+--Listing files in the stage
+list @MYDB.EXTERNAL_STAGES.ADF_EXT_STAGE
+
+--Creating Stage Table to store RAW Data 
+CREATE OR REPLACE TABLE MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW 
+(raw_file variant);
+
+
+--Copy the RAW data into a Stage Table
+COPY INTO MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW 
+    FROM @MYDB.external_stages.STAGE_JSON
+    file_format= MYDB.file_formats.FILE_FORMAT_JSON
+    FILES=('pets_data.json');
+
+--View RAW table data
+SELECT * FROM MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW;
+
+--Extracting single column
+SELECT raw_file:Name::string as Name FROM MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW;
+
+--Extracting Array data
+SELECT raw_file:Name::string as Name,
+       raw_file:Pets[0]::string as Pet 
+FROM MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW;
+
+--Get the size of ARRAY
+SELECT raw_file:Name::string as Name, ARRAY_SIZE(RAW_FILE:Pets) as PETS_AR_SIZE 
+FROM MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW;
+
+SELECT max(ARRAY_SIZE(RAW_FILE:Pets)) as PETS_AR_SIZE 
+FROM MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW;
+
+--Extracting nested data
+SELECT raw_file:Name::string as Name,
+       raw_file:Address."House Number"::string as House_No,
+       raw_file:Address.City::string as City,
+       raw_file:Address.State::string as State
+FROM MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW;
+
+--Parsing entire file
+SELECT raw_file:Name::string as Name,
+       raw_file:Gender::string as Gender,
+       raw_file:DOB::date as DOB,
+       raw_file:Pets[0]::string as Pets,
+       raw_file:Address."House Number"::string as House_No,
+    raw_file:Address.City::string as City,
+    raw_file:Address.State::string as State,
+    raw_file:Phone.Work::number as Work_Phone,
+    raw_file:Phone.Mobile::number as Mobile_Phone
+from MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW
+UNION ALL
+SELECT raw_file:Name::string as Name,
+       raw_file:Gender::string as Gender,
+       raw_file:DOB::date as DOB,
+       raw_file:Pets[1]::string as Pets,
+       raw_file:Address."House Number"::string as House_No,
+    raw_file:Address.City::string as City,
+    raw_file:Address.State::string as State,
+    raw_file:Phone.Work::number as Work_Phone,
+    raw_file:Phone.Mobile::number as Mobile_Phone
+from MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW
+UNION ALL
+SELECT raw_file:Name::string as Name,
+       raw_file:Gender::string as Gender,
+       raw_file:DOB::date as DOB,
+       raw_file:Pets[2]::string as Pets,
+       raw_file:Address."House Number"::string as House_No,
+    raw_file:Address.City::string as City,
+    raw_file:Address.State::string as State,
+    raw_file:Phone.Work::number as Work_Phone,
+    raw_file:Phone.Mobile::number as Mobile_Phone
+from MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW
+WHERE Pets is not null;
+
+--Creating/Loading parsed data to another table
+CREATE TABLE MYDB.INTG_TBLS.PETS_DATA;
+AS
+ABOVE SELECT STATEMENT
+
+--Viewing final data
+SELECT * from MYDB.INTG_TBLS.PETS_DATA;
+
+--Truncate and Reload by using flatten
+
+TRUNCATE TABLE MYDB.INTG_TBLS.PETS_DATA;
+
+INSERT INTO MYDB.INTG_TBLS.PETS_DATA
+select  
+       raw_file:Name::string as Name,
+       raw_file:Gender::string as Gender,
+       raw_file:DOB::date as DOB,
+       f1.value::string as Pet,
+       raw_file:Address."House Number"::string as House_No,
+    raw_file:Address.City::string as City,
+    raw_file:Address.State::string as State,
+    raw_file:Phone.Work::number as Work_Phone,
+    raw_file:Phone.Mobile::number as Mobile_Phone
+FROM MYDB.STAGE_TBLS.PETS_DATA_JSON_RAW, 
+table(flatten(raw_file:Pets)) f1;
