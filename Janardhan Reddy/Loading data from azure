@@ -1,0 +1,57 @@
+-- Create a storage integration object
+CREATE OR REPLACE STORAGE INTEGRATION snow_azure_int
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = AZURE
+  ENABLED = TRUE
+  AZURE_TENANT_ID = 'eecc57ea-542e-46da-a24c-e543715a0d37'
+  STORAGE_ALLOWED_LOCATIONS = ('azure://snowflakeshubham.blob.core.windows.net/sksnowflakes/');
+
+  show integrations;
+  
+-- Describe integration object
+DESC STORAGE INTEGRATION snow_azure_int;
+
+desc file format file_formats.csv_file_format;
+
+-----------------------------------
+// Create database and schema
+CREATE DATABASE IF NOT EXISTS MYDB;
+CREATE SCHEMA IF NOT EXISTS MYDB.file_formats;
+CREATE SCHEMA IF NOT EXISTS MYDB.external_stages;
+
+// Create file format object
+CREATE OR REPLACE file format mydb.file_formats.csv_file_format
+    type = csv
+    field_delimiter = ','
+    skip_header = 1
+    empty_field_as_null = TRUE;    
+    
+// Create stage object with integration object & file format object
+CREATE OR REPLACE STAGE mydb.external_stages.stg_azure_cont
+    STORAGE_INTEGRATION = SNOW_AZURE_INT
+    URL = 'azure://snowflakeshubham.blob.core.windows.net/sksnowflakes/'
+    FILE_FORMAT = MYDB.FILE_FORMATS.CSV_FILE_FORMAT
+
+
+//Listing files under your azure containers
+list @mydb.external_stages.stg_azure_cont;
+
+
+// Create a table first
+CREATE OR REPLACE TABLE mydb.public.employee_data 
+(
+id INTEGER,
+first_name VARCHAR,
+last VARCHAR,
+email VARCHAR,
+location VARCHAR,
+department VARCHAR
+); 
+
+// Use Copy command to load the files
+COPY INTO mydb.public.employee_data
+    FROM @mydb.external_stages.stg_azure_cont
+    PATTERN = '.*employee.*';    
+ 
+//Validate the data
+SELECT * FROM mydb.public.employee_data;
