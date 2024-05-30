@@ -1,0 +1,82 @@
+// Create database and schemas if not exists already
+CREATE DATABASE IF NOT EXISTS MYDB;
+CREATE SCHEMA IF NOT EXISTS MYDB.file_formats;
+CREATE SCHEMA IF NOT EXISTS MYDB.external_stages;
+
+ 
+// Create a file format object of csv type
+CREATE OR REPLACE file format mydb.file_formats.csv_file_format
+    type = csv
+    field_delimiter = ','
+    skip_header = 1
+    empty_field_as_null = TRUE;
+
+-- // Create a stage object using storage integration
+CREATE OR REPLACE stage mydb.external_stages.stage_adf_pipes
+    URL = 'azure://snowflakeshubham.blob.core.windows.net/csv/'
+    STORAGE_INTEGRATION = ADF_ADLSGEN2_INT
+    FILE_FORMAT = mydb.file_formats.csv_fileformat;   
+
+    DROP FILE FORMAT  mydb.file_formats.csv_fileformat
+
+
+-- // List the files in Stage
+-- LIST @mydb.external_stages.stage_adf_pipes;
+
+---------------------------------------------------------------------------------------------------------------
+--create a new notification integration 
+CREATE OR REPLACE notification integration SNOWPIPE_DEMO_EVENT
+enabled = true
+type = queue
+notification_provider = azure_storage_queue
+azure_storage_queue_primary_uri = 'https://snowflakeshubham.queue.core.windows.net/snowpipe-notification-queue'
+azure_tenant_id = 'eecc57ea-542e-46da-a24c-e543715a0d37';
+
+show integrations;
+
+DESC notification integration SNOWPIPE_DEMO_EVENT;
+
+alter file format file_formats.csv_file_format
+set ERROR_ON_COLUMN_COUNT_MISMATCH = false;
+
+desc file format file_formats.csv_file_format;
+
+--create a stage object by using storage integration
+CREATE OR REPLACE STAGE MYDB.external_stages.azure_pipe_int
+  url = 'azure://snowflakeshubham.blob.core.windows.net/pipes/csv/'
+  credentials = (azure_sas_token= '?sv=2022-11-02&ss=bfqt&srt=s&sp=rwdlacupyx&se=2024-07-18T13:13:26Z&st=2024-05-18T05:13:26Z&spr=https&sig=jGhbnpBte2%2FqzstLIygHzPS2Ec7CHHrFg8IfcZh2Y%2BE%3D');
+
+list @MYDB.EXTERNAL_STAGES.AZURE_PIPE_INT;
+
+----------------------------------------------------------------------------------------------------
+ 
+// Create a table to load these files
+CREATE OR REPLACE TABLE mydb.public.emp_data 
+(
+  id INT,
+  first_name STRING,
+  last_name STRING,
+  email STRING,
+  location STRING,
+  department STRING
+);
+  
+
+// Create a schema to keep pipe objects
+CREATE OR REPLACE SCHEMA mydb.pipes;
+
+// Create a pipe
+CREATE OR REPLACE pipe mydb.pipes.employee_pipe
+AUTO_INGEST = TRUE
+AS
+COPY INTO mydb.public.emp_data
+FROM @mydb.external_stages.stage_adf_pipes
+pattern = '.*employee.*';
+
+// Describe pipe to get ARN
+DESC pipe employee_pipe;
+
+// Get Notification channel ARN and update the same in event notifications SQS queue
+ 
+// Upload the file and verify the data in the table after a minute
+SELECT * FROM mydb.public.emp_data;
