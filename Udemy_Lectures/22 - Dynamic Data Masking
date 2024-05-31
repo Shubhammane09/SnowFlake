@@ -85,11 +85,13 @@ SELECT * FROM CUSTOMERS;
 
 
 
- #### More examples  #####
+ -- #### More examples  #####
 
 USE ROLE ACCOUNTADMIN;
 
+
 --- 1) Apply policy to multiple columns
+
 
 -- Apply policy on a specific column 
 ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN full_name 
@@ -121,7 +123,7 @@ SELECT * FROM table(information_schema.policy_references(policy_name=>'phone'));
 
 -- Remove policy before replacing/dropping 
 ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN full_name 
-SET MASKING POLICY phone;
+UNSET MASKING POLICY;
 
 ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN email
 UNSET MASKING POLICY;
@@ -129,6 +131,7 @@ UNSET MASKING POLICY;
 ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN phone
 UNSET MASKING POLICY;
 
+---------------------------------------------------------------------------
 
 
 -- replace policy
@@ -137,11 +140,13 @@ create or replace masking policy names as (val varchar) returns varchar ->
             when current_role() in ('ANALYST_FULL', 'ACCOUNTADMIN') then val
             else CONCAT(LEFT(val,2),'*******')
             end;
-
--- apply policy
+            
+-- apply policy names IN full_name COLUMN
 ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN full_name
 SET MASKING POLICY names;
 
+-- Show columns with applied policies
+SELECT * FROM table(information_schema.policy_references(policy_name=>'names'));
 
 -- Validating policies
 USE ROLE ANALYST_FULL;
@@ -151,6 +156,10 @@ USE ROLE ANALYST_MASKED;
 SELECT * FROM CUSTOMERS;
 
 
+
+-- Unapply policy
+ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN full_name
+UNSET MASKING POLICY;
 
 ---------------------------------------------------------------------------
 ---------------------------------------------------------------------------
@@ -165,7 +174,6 @@ SELECT * FROM CUSTOMERS;
 USE ROLE ACCOUNTADMIN;
 
 
-
 alter masking policy phone set body ->
 case        
  when current_role() in ('ANALYST_FULL', 'ACCOUNTADMIN') then val
@@ -173,7 +181,8 @@ case
  end;
 
             
-  ALTER TABLE CUSTOMERS MODIFY COLUMN email UNSET MASKING POLICY;
+  ALTER TABLE CUSTOMERS MODIFY COLUMN email
+  UNSET MASKING POLICY;
   
 ---------------------------------------------------------------------------
 ---------------------------------------------------------------------------
