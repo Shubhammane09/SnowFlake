@@ -102,10 +102,11 @@ ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN phone
 SET MASKING POLICY phone;
 
 
-
 --- 2) Replace or drop policy
 
 DROP masking policy phone;
+
+---------------------------------------------------------------------------
 
 create or replace masking policy phone as (val varchar) returns varchar ->
             case
@@ -155,11 +156,13 @@ SELECT * FROM CUSTOMERS;
 USE ROLE ANALYST_MASKED;
 SELECT * FROM CUSTOMERS;
 
-
-
 -- Unapply policy
 ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN full_name
 UNSET MASKING POLICY;
+
+
+ -- drop policy
+DROP masking policy names;
 
 ---------------------------------------------------------------------------
 ---------------------------------------------------------------------------
@@ -190,9 +193,6 @@ case
 -- 005 Real-life-examples
 
 
-
-
-
 ### More examples - 1 - ###
 
 USE ROLE ACCOUNTADMIN;
@@ -219,8 +219,19 @@ SELECT * FROM CUSTOMERS;
 
 USE ROLE ACCOUNTADMIN;
 
+ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN email
+UNSET MASKING POLICY;
 
-### More examples - 2 - ###
+-- List and describe policies
+DESC MASKING POLICY emails;
+SHOW MASKING POLICIES;
+
+-- drop policy
+DROP masking policy emails;
+
+---------------------------------------------------------------------------
+
+-- ### More examples - 2 - ###
 
 
 create or replace masking policy sha2 as (val varchar) returns varchar ->
@@ -235,9 +246,6 @@ end;
 ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN full_name
 SET MASKING POLICY sha2;
 
-ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN full_name
-UNSET MASKING POLICY;
-
 
 -- Validating policies
 USE ROLE ANALYST_FULL;
@@ -248,6 +256,18 @@ SELECT * FROM CUSTOMERS;
 
 USE ROLE ACCOUNTADMIN;
 
+-- Unset masking policy 
+ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN full_name
+UNSET MASKING POLICY;
+
+-- List and describe policies
+DESC MASKING POLICY sha2;
+SHOW MASKING POLICIES;
+
+-- drop policy
+DROP masking policy sha2;
+
+---------------------------------------------------------------------------
 
 ### More examples - 3 - ###
 
@@ -270,3 +290,16 @@ SELECT * FROM CUSTOMERS;
 
 USE ROLE ANALYST_MASKED;
 SELECT * FROM CUSTOMERS;
+
+USE ROLE ACCOUNTADMIN;
+
+-- Unset masking policy 
+ALTER TABLE IF EXISTS CUSTOMERS MODIFY COLUMN create_date
+UNSET MASKING POLICY;
+
+-- List and describe policies
+DESC MASKING POLICY dates;
+SHOW MASKING POLICIES;
+
+-- drop policy
+DROP masking policy dates;
